@@ -19,9 +19,12 @@ class SimulateSensorReadings implements ShouldQueue
 
     public function handle(): void
     {
-        $sensors = Sensor::where('status', 'online')->get();
+        $sensors = Sensor::all();
 
         foreach ($sensors as $sensor) {
+            if ($sensor->status === 'offline') {
+                $sensor->update(['status' => 'online']);
+            }
             $lastReading = $sensor->latestReading;
             
             $newReading = new SensorReading([
@@ -45,7 +48,11 @@ class SimulateSensorReadings implements ShouldQueue
                         'type' => 'critical',
                         'category' => 'moisture',
                     ]);
-                    broadcast(new AlertCreated($alert));
+                    try {
+                        broadcast(new AlertCreated($alert));
+                    } catch (\Exception $e) {
+                        // Fail gracefully
+                    }
                 }
             }
 
@@ -56,12 +63,41 @@ class SimulateSensorReadings implements ShouldQueue
                 $baseHum = $lastReading ? $lastReading->humidity : 60;
                 $newReading->humidity = max(20, min(90, $baseHum + rand(-2, 2)));
             }
+            
+            if ($sensor->type === 'temperature') {
+                $baseTemp = $lastReading ? $lastReading->temperature : 25;
+                $newReading->temperature = max(10, min(50, $baseTemp + (rand(-10, 10) / 10)));
+            }
+
+            if ($sensor->type === 'humidity') {
+                $baseHum = $lastReading ? $lastReading->humidity : 60;
+                $newReading->humidity = max(20, min(90, $baseHum + rand(-2, 2)));
+            }
+
+            if ($sensor->type === 'water_level') {
+                $baseWater = $lastReading ? $lastReading->water_level : 50;
+                $newReading->water_level = max(0, min(100, $baseWater + rand(-1, 1)));
+            }
+
+            if ($sensor->type === 'ph_sensor') {
+                $basePh = $lastReading ? $lastReading->ph_level : 6.5;
+                $newReading->ph_level = max(4.0, min(9.0, $basePh + (rand(-1, 1) / 10)));
+            }
+
+            if ($sensor->type === 'light') {
+                $baseLight = $lastReading ? $lastReading->light_intensity : 50000;
+                $newReading->light_intensity = max(0, min(100000, $baseLight + rand(-1000, 1000)));
+            }
 
             $newReading->save();
             $sensor->update(['last_reading_at' => now()]);
 
             // Broadcast the new reading
-            broadcast(new SensorDataUpdated($newReading));
+            try {
+                broadcast(new SensorDataUpdated($newReading));
+            } catch (\Exception $e) {
+                // Fail gracefully if Reverb is offline/restarting
+            }
         }
     }
 }

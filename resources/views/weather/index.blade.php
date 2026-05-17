@@ -41,10 +41,40 @@
     @media (max-width: 640px) { .wx-forecast-grid { grid-template-columns: repeat(2, 1fr); } .wx-hero { flex-direction: column; } }
 </style>
 
-<div style="margin-bottom: 1.5rem;">
-    <h1 style="font-size: 1.5rem; font-weight: 800; color: var(--text-main); margin: 0;">Weather Dashboard</h1>
-    <p style="color: var(--text-muted); font-size: 0.9rem; margin-top: 0.25rem;">{{ $activeFarm?->location ?? 'No farm selected' }}</p>
+<div style="margin-bottom: 1.5rem; display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 1rem;">
+    <div>
+        <h1 style="font-size: 1.5rem; font-weight: 800; color: var(--text-main); margin: 0;">Weather Dashboard</h1>
+        <p style="color: var(--text-muted); font-size: 0.9rem; margin-top: 0.25rem;">{{ $activeFarm?->location ?? 'No farm selected' }}</p>
+    </div>
+
+    {{-- Farm switcher --}}
+    @if($farms->count() > 1)
+    <form method="GET" action="{{ route('weather.index') }}" style="display: flex; align-items: center; gap: 0.5rem;">
+        <select name="farm_id" onchange="this.form.submit()"
+            style="padding: 0.5rem 0.75rem; border: 1px solid var(--border-color); border-radius: 8px; font-size: 0.85rem; background: #fff; color: var(--text-main); outline: none;">
+            @foreach($farms as $farm)
+                <option value="{{ $farm->id }}" {{ $activeFarm?->id == $farm->id ? 'selected' : '' }}>
+                    {{ $farm->name }}
+                </option>
+            @endforeach
+        </select>
+    </form>
+    @endif
 </div>
+
+{{-- Missing coordinates warning --}}
+@if($missingCoords)
+<div style="background: #fef3c7; border: 1px solid #fde68a; border-radius: 12px; padding: 1.25rem 1.5rem; margin-bottom: 1.5rem; display: flex; align-items: center; gap: 1rem;">
+    <i class="fas fa-map-marker-alt" style="color: #d97706; font-size: 1.25rem;"></i>
+    <div>
+        <p style="font-weight: 700; color: #92400e; margin: 0 0 0.25rem;">No coordinates set for <em>{{ $activeFarm->name }}</em></p>
+        <p style="font-size: 0.85rem; color: #78350f; margin: 0;">
+            Add a latitude and longitude to this farm so weather data can be fetched automatically.
+            Go to <a href="{{ route('farms.index') }}" style="color: #d97706; font-weight: 600;">Farms</a> and edit the farm to add its location.
+        </p>
+    </div>
+</div>
+@endif
 
 @if($currentWeather)
 <!-- Hero -->
@@ -122,8 +152,14 @@
 @else
 <div class="empty-wx">
     <i class="fas fa-cloud" style="font-size: 2.5rem; color: #cbd5e1; margin-bottom: 1rem;"></i>
-    <h3 style="font-size: 1.1rem; font-weight: 700; color: var(--text-main); margin-bottom: 0.5rem;">No weather data</h3>
-    <p style="font-size: 0.9rem; color: var(--text-muted);">Weather data will appear once your farm is configured.</p>
+    <h3 style="font-size: 1.1rem; font-weight: 700; color: var(--text-main); margin-bottom: 0.5rem;">No weather data yet</h3>
+    <p style="font-size: 0.9rem; color: var(--text-muted); margin-bottom: 0.5rem;">
+        Weather is fetched automatically every 30 minutes once your farm has coordinates set.
+    </p>
+    <p style="font-size: 0.85rem; color: var(--text-muted);">
+        You can also run it manually:<br>
+        <code style="background: #f1f5f9; padding: 0.2rem 0.5rem; border-radius: 4px; font-size: 0.8rem;">php artisan weather:fetch</code>
+    </p>
 </div>
 @endif
 @endsection

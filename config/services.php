@@ -35,4 +35,15 @@ return [
         ],
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | OpenWeatherMap
+    |--------------------------------------------------------------------------
+    | Free API key from https://openweathermap.org/api
+    | Set OPENWEATHERMAP_API_KEY in your .env file.
+    */
+    'openweathermap' => [
+        'key' => env('OPENWEATHERMAP_API_KEY'),
+    ],
+
 ];

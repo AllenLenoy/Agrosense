@@ -21,8 +21,10 @@ class SearchController extends Controller
         $user = Auth::user();
         
         // Search Farms
-        $farmsQuery = Farm::where('name', 'like', "%{$query}%")
-                         ->orWhere('location', 'like', "%{$query}%");
+        $farmsQuery = Farm::where(function($q) use ($query) {
+            $q->where('name', 'like', "%{$query}%")
+              ->orWhere('location', 'like', "%{$query}%");
+        });
                          
         if (!$user->isAdmin()) {
             $farmsQuery->where('user_id', $user->id);
@@ -36,7 +38,7 @@ class SearchController extends Controller
                         ->where(function($q) use ($query) {
                             $q->where('name', 'like', "%{$query}%")
                               ->orWhere('type', 'like', "%{$query}%")
-                              ->orWhere('mac_address', 'like', "%{$query}%");
+                              ->orWhere('device_id', 'like', "%{$query}%");
                         })->get();
 
         // Search Alerts

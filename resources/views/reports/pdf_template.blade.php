@@ -109,35 +109,6 @@
     <p>No recent alerts recorded.</p>
     @endif
 
-    <div class="section-title">AI Disease Detections</div>
-    @if($diseases->count() > 0)
-    <table class="data-table">
-        <thead>
-            <tr>
-                <th>Date Detected</th>
-                <th>Disease Name</th>
-                <th>Confidence</th>
-                <th>Severity</th>
-            </tr>
-        </thead>
-        <tbody>
-            @foreach($diseases as $disease)
-            <tr>
-                <td>{{ $disease->created_at->format('Y-m-d') }}</td>
-                <td>{{ $disease->disease_name }}</td>
-                <td>{{ $disease->confidence }}%</td>
-                <td>
-                    <span class="badge badge-{{ $disease->severity }}">
-                        {{ strtoupper($disease->severity ?? 'info') }}
-                    </span>
-                </td>
-            </tr>
-            @endforeach
-        </tbody>
-    </table>
-    @else
-    <p>No plant diseases detected by AI.</p>
-    @endif
 
     <div class="footer">
         AgroSense Platform &copy; {{ date('Y') }} &middot; Official Compliance Record &middot; Page 1

@@ -109,11 +109,38 @@
             @csrf
             <label class="fm-label">Farm Name</label>
             <input name="name" required class="fm-input" placeholder="e.g. Punjab Wheat Farm" value="{{ old('name') }}">
+
             <label class="fm-label">Location</label>
-            <input name="location" required class="fm-input" placeholder="e.g. Ludhiana, Punjab" value="{{ old('location') }}">
+            <div style="position:relative;margin-bottom:1rem">
+                <input name="location" id="farm-location-input" required class="fm-input"
+                    placeholder="e.g. Ludhiana, Punjab" value="{{ old('location') }}"
+                    style="margin-bottom:0;padding-right:2.5rem"
+                    oninput="clearCoords('create')">
+                <button type="button" onclick="useGPS('create')" title="Use my current location"
+                    style="position:absolute;right:.6rem;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:var(--primary);font-size:.95rem">
+                    <i class="fas fa-location-arrow"></i>
+                </button>
+            </div>
+            <div id="create-geocode-status" style="font-size:.75rem;margin-top:-.75rem;margin-bottom:.75rem;display:none"></div>
+
+            {{-- Hidden coordinate fields — filled by geocoding JS --}}
+            <input type="hidden" name="latitude"  id="create-lat"  value="{{ old('latitude') }}">
+            <input type="hidden" name="longitude" id="create-lng"  value="{{ old('longitude') }}">
+
             <div class="fm-row">
-                <div><label class="fm-label">Area (acres)</label><input name="area_acres" type="number" step="0.01" class="fm-input" placeholder="85.5" value="{{ old('area_acres') }}"></div>
-                <div><label class="fm-label">Soil Type</label><input name="soil_type" class="fm-input" placeholder="Alluvial" value="{{ old('soil_type') }}"></div>
+                <div>
+                    <label class="fm-label">Area (acres)</label>
+                    <input name="area_acres" type="number" step="0.01" class="fm-input" placeholder="85.5" value="{{ old('area_acres') }}">
+                </div>
+                <div>
+                    <label class="fm-label">Soil Type</label>
+                    <select name="soil_type" class="fm-input">
+                        <option value="">— Select —</option>
+                        @foreach(['Loam','Clay','Sandy','Silt','Sandy Loam','Clay Loam','Silty Clay','Peat','Chalky','Alluvial'] as $s)
+                        <option value="{{ $s }}" {{ old('soil_type') == $s ? 'selected' : '' }}>{{ $s }}</option>
+                        @endforeach
+                    </select>
+                </div>
             </div>
             <label class="fm-label">Description</label>
             <textarea name="description" rows="2" class="fm-input" placeholder="Brief description..." style="resize:vertical">{{ old('description') }}</textarea>
@@ -124,4 +151,99 @@
         </form>
     </div>
 </div>
+@endsection
+
+@section('scripts')
+<script>
+// ── Geocoding helpers ─────────────────────────────────────────────────────────
+let geocodeTimer = null;
+
+function clearCoords(prefix) {
+    document.getElementById(prefix + '-lat').value = '';
+    document.getElementById(prefix + '-lng').value = '';
+    showStatus(prefix, '', '');
+}
+
+function showStatus(prefix, msg, color) {
+    const el = document.getElementById(prefix + '-geocode-status');
+    if (!el) return;
+    el.textContent = msg;
+    el.style.color = color;
+    el.style.display = msg ? 'block' : 'none';
+}
+
+function geocodeLocation(inputId, latId, lngId, statusPrefix) {
+    const query = document.getElementById(inputId).value.trim();
+    if (query.length < 4) return;
+
+    showStatus(statusPrefix, '⏳ Looking up coordinates…', '#64748b');
+
+    clearTimeout(geocodeTimer);
+    geocodeTimer = setTimeout(() => {
+        fetch('https://nominatim.openstreetmap.org/search?format=json&limit=1&q=' + encodeURIComponent(query), {
+            headers: { 'Accept-Language': 'en' }
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.length > 0) {
+                const lat = parseFloat(data[0].lat).toFixed(7);
+                const lng = parseFloat(data[0].lon).toFixed(7);
+                document.getElementById(latId).value = lat;
+                document.getElementById(lngId).value = lng;
+                showStatus(statusPrefix,
+                    '✅ Coordinates found: ' + lat + ', ' + lng + ' — weather will be fetched automatically.',
+                    '#166534');
+            } else {
+                showStatus(statusPrefix,
+                    '⚠️ Location not found. Enter a more specific name or use GPS.',
+                    '#92400e');
+            }
+        })
+        .catch(() => showStatus(statusPrefix, '⚠️ Geocoding failed. Check your connection.', '#b91c1c'));
+    }, 800); // debounce 800ms
+}
+
+function useGPS(prefix) {
+    if (!navigator.geolocation) {
+        showStatus(prefix, '⚠️ GPS not supported by your browser.', '#b91c1c');
+        return;
+    }
+    showStatus(prefix, '⏳ Getting your location…', '#64748b');
+    navigator.geolocation.getCurrentPosition(
+        (pos) => {
+            const lat = pos.coords.latitude.toFixed(7);
+            const lng = pos.coords.longitude.toFixed(7);
+            document.getElementById(prefix + '-lat').value = lat;
+            document.getElementById(prefix + '-lng').value = lng;
+            showStatus(prefix,
+                '✅ GPS location set: ' + lat + ', ' + lng,
+                '#166534');
+            // Reverse geocode to fill the location text field
+            fetch('https://nominatim.openstreetmap.org/reverse?format=json&lat=' + lat + '&lon=' + lng)
+                .then(r => r.json())
+                .then(data => {
+                    const addr = data.address;
+                    const label = [addr.village || addr.town || addr.city, addr.state, addr.country]
+                        .filter(Boolean).join(', ');
+                    const inputId = prefix === 'create' ? 'farm-location-input' : 'edit-location-input';
+                    if (label) document.getElementById(inputId).value = label;
+                })
+                .catch(() => {});
+        },
+        () => showStatus(prefix, '⚠️ GPS access denied. Enter location manually.', '#b91c1c')
+    );
+}
+
+// Attach geocode-on-blur to the create form location input
+document.addEventListener('DOMContentLoaded', () => {
+    const createInput = document.getElementById('farm-location-input');
+    if (createInput) {
+        createInput.addEventListener('blur', () => {
+            if (!document.getElementById('create-lat').value) {
+                geocodeLocation('farm-location-input', 'create-lat', 'create-lng', 'create');
+            }
+        });
+    }
+});
+</script>
 @endsection

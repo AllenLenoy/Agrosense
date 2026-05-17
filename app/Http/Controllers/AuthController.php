@@ -33,6 +33,15 @@ class AuthController extends Controller
         ]);
 
         if (Auth::attempt($credentials, $request->boolean('remember'))) {
+            if (!Auth::user()->is_active) {
+                Auth::logout();
+                $request->session()->invalidate();
+                $request->session()->regenerateToken();
+                return back()->withErrors([
+                    'email' => 'Your account has been deactivated. Please contact an administrator.',
+                ])->onlyInput('email');
+            }
+
             $request->session()->regenerate();
             Auth::user()->update(['last_login_at' => now()]);
 
@@ -69,21 +78,21 @@ class AuthController extends Controller
     public function register(Request $request)
     {
         $request->validate([
-            'name' => ['required', 'string', 'max:255'],
-            'email' => ['required', 'string', 'email', 'max:255', 'unique:users'],
+            'name'     => ['required', 'string', 'max:255'],
+            'email'    => ['required', 'string', 'email', 'max:255', 'unique:users'],
             'password' => ['required', 'confirmed', Rules\Password::defaults()],
-            'phone' => ['nullable', 'string', 'max:20'],
+            'phone'    => ['nullable', 'string', 'max:20'],
             'location' => ['nullable', 'string', 'max:255'],
-            'role' => ['required', 'string', 'in:farmer,admin'],
+            'role'     => ['required', 'string', 'in:farmer,admin'],
         ]);
 
         $user = User::create([
-            'name' => $request->name,
-            'email' => $request->email,
+            'name'     => $request->name,
+            'email'    => $request->email,
             'password' => Hash::make($request->password),
-            'phone' => $request->phone,
+            'phone'    => $request->phone,
             'location' => $request->location,
-            'role' => $request->role,
+            'role'     => $request->role,
         ]);
 
         Auth::login($user);

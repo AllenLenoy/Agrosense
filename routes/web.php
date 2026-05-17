@@ -7,7 +7,6 @@ use App\Http\Controllers\IrrigationController;
 use App\Http\Controllers\FarmController;
 use App\Http\Controllers\AlertController;
 use App\Http\Controllers\WeatherController;
-use App\Http\Controllers\DiseaseController;
 use App\Http\Controllers\RecommendationController;
 use Illuminate\Support\Facades\Route;
 
@@ -34,12 +33,18 @@ Route::middleware('auth')->group(function () {
 
     // Sensors
     Route::get('/sensors', [SensorController::class, 'index'])->name('sensors.index');
+    Route::post('/sensors', [SensorController::class, 'storeFromIndex'])->name('sensors.storeFromIndex');
     Route::get('/sensors/{sensor}', [SensorController::class, 'show'])->name('sensors.show');
+    Route::put('/sensors/{sensor}', [SensorController::class, 'update'])->name('sensors.update');
+    Route::delete('/sensors/{sensor}', [SensorController::class, 'destroy'])->name('sensors.destroy');
 
     // Irrigation
     Route::get('/irrigation', [IrrigationController::class, 'index'])->name('irrigation.index');
     Route::post('/irrigation/start', [IrrigationController::class, 'start'])->name('irrigation.start');
     Route::post('/irrigation/{log}/toggle', [IrrigationController::class, 'toggle'])->name('irrigation.toggle');
+    Route::post('/irrigation/schedules', [IrrigationController::class, 'storeSchedule'])->name('schedules.store');
+    Route::put('/irrigation/schedules/{schedule}', [IrrigationController::class, 'updateSchedule'])->name('schedules.update');
+    Route::delete('/irrigation/schedules/{schedule}', [IrrigationController::class, 'destroySchedule'])->name('schedules.destroy');
 
     // Farms
     Route::get('/farms', [FarmController::class, 'index'])->name('farms.index');
@@ -48,6 +53,9 @@ Route::middleware('auth')->group(function () {
     Route::put('/farms/{farm}', [FarmController::class, 'update'])->name('farms.update');
     Route::delete('/farms/{farm}', [FarmController::class, 'destroy'])->name('farms.destroy');
     Route::post('/farms/{farm}/fields', [\App\Http\Controllers\FieldController::class, 'store'])->name('fields.store');
+    Route::post('/fields/{field}/crops', [\App\Http\Controllers\CropController::class, 'store'])->name('crops.store');
+    Route::put('/crops/{crop}', [\App\Http\Controllers\CropController::class, 'update'])->name('crops.update');
+    Route::delete('/crops/{crop}', [\App\Http\Controllers\CropController::class, 'destroy'])->name('crops.destroy');
     Route::post('/farms/{farm}/sensors', [SensorController::class, 'store'])->name('sensors.store');
 
     // Alerts
@@ -58,11 +66,6 @@ Route::middleware('auth')->group(function () {
 
     // Weather
     Route::get('/weather', [WeatherController::class, 'index'])->name('weather.index');
-
-    // Disease detection
-    Route::get('/diseases', [DiseaseController::class, 'index'])->name('diseases.index');
-    Route::get('/diseases/upload', [DiseaseController::class, 'create'])->name('diseases.create');
-    Route::post('/diseases', [DiseaseController::class, 'store'])->name('diseases.store');
 
     // AI Recommendations
     Route::get('/recommendations', [RecommendationController::class, 'index'])->name('recommendations.index');
@@ -91,6 +94,7 @@ Route::middleware(['auth', \App\Http\Middleware\AdminMiddleware::class])->prefix
     Route::put('/devices/{sensor}', [\App\Http\Controllers\AdminController::class, 'updateDevice'])->name('admin.devices.update');
     Route::delete('/devices/{sensor}', [\App\Http\Controllers\AdminController::class, 'deleteDevice'])->name('admin.devices.delete');
     Route::get('/alerts', [\App\Http\Controllers\AdminController::class, 'alerts'])->name('admin.alerts');
+    Route::get('/activity', [\App\Http\Controllers\AdminController::class, 'activity'])->name('admin.activity');
     Route::post('/users', [\App\Http\Controllers\AdminController::class, 'storeUser'])->name('admin.users.store');
     Route::put('/users/{user}', [\App\Http\Controllers\AdminController::class, 'updateUser'])->name('admin.users.update');
     Route::post('/users/{user}/toggle', [\App\Http\Controllers\AdminController::class, 'toggleUser'])->name('admin.users.toggle');

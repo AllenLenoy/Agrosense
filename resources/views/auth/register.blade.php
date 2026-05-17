@@ -73,21 +73,6 @@
 
                 <form method="POST" action="{{ route('register') }}">
                     @csrf
-                    
-                    <div class="role-selection">
-                        <label class="role-card {{ old('role', 'farmer') === 'farmer' ? 'active' : '' }}" id="farmer-card">
-                            <input type="radio" name="role" value="farmer" {{ old('role', 'farmer') === 'farmer' ? 'checked' : '' }}>
-                            <div class="role-card-icon"><i class="fas fa-tractor"></i></div>
-                            <div class="role-card-text">Farmer</div>
-                            <div class="role-card-desc">Manage crops & IoT</div>
-                        </label>
-                        <label class="role-card {{ old('role') === 'admin' ? 'active' : '' }}" id="admin-card">
-                            <input type="radio" name="role" value="admin" {{ old('role') === 'admin' ? 'checked' : '' }}>
-                            <div class="role-card-icon"><i class="fas fa-user-shield"></i></div>
-                            <div class="role-card-text">Admin</div>
-                            <div class="role-card-desc">Platform oversight</div>
-                        </label>
-                    </div>
 
                     <div class="form-group">
                         <div class="input-wrapper">
@@ -107,6 +92,23 @@
                         <div class="input-wrapper">
                             <i class="fas fa-phone-alt input-icon" style="opacity: 0.7; font-size: 0.9em;"></i>
                             <input type="tel" name="phone" class="form-control" placeholder="Phone number (optional)" value="{{ old('phone') }}">
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <div class="role-selection">
+                            <label class="role-card active" id="role-farmer-card">
+                                <input type="radio" name="role" value="farmer" checked onclick="selectRole('farmer')">
+                                <div class="role-card-icon"><i class="fas fa-seedling"></i></div>
+                                <div class="role-card-text">Farmer</div>
+                                <div class="role-card-desc">Manage crops & irrigation</div>
+                            </label>
+                            <label class="role-card" id="role-admin-card">
+                                <input type="radio" name="role" value="admin" onclick="selectRole('admin')">
+                                <div class="role-card-icon"><i class="fas fa-user-shield"></i></div>
+                                <div class="role-card-text">Admin</div>
+                                <div class="role-card-desc">Manage system & hardware</div>
+                            </label>
                         </div>
                     </div>
 
@@ -144,10 +146,24 @@
     </div>
 
     <script>
-        document.querySelectorAll('.role-card').forEach(card => {
-            card.addEventListener('click', function() {
-                document.querySelectorAll('.role-card').forEach(c => c.classList.remove('active'));
-                this.classList.add('active');
+        // Role selection toggle
+        function selectRole(role) {
+            document.querySelectorAll('.role-card').forEach(card => card.classList.remove('active'));
+            document.getElementById(`role-${role}-card`).classList.add('active');
+        }
+
+        // Password visibility toggle
+        document.querySelectorAll('.password-toggle').forEach(btn => {
+            btn.addEventListener('click', function() {
+                const input = this.previousElementSibling;
+                const icon  = this.querySelector('i');
+                if (input.type === 'password') {
+                    input.type = 'text';
+                    icon.classList.replace('fa-eye-slash', 'fa-eye');
+                } else {
+                    input.type = 'password';
+                    icon.classList.replace('fa-eye', 'fa-eye-slash');
+                }
             });
         });
     </script>

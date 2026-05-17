@@ -9,7 +9,7 @@ use App\Models\Alert;
 use App\Models\IrrigationLog;
 use App\Models\SensorReading;
 use App\Models\ActivityLog;
-use App\Models\DiseaseReport;
+
 use Illuminate\Http\Request;
 use Carbon\Carbon;
 

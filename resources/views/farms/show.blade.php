@@ -167,10 +167,15 @@ document.addEventListener('DOMContentLoaded', function () {
                         <span><i class="fas fa-seedling"></i> {{ $field->current_crop ?? 'Idle' }}</span>
                     </div>
                     @if($field->crops->count() > 0)
-                    <div style="padding-top:.5rem;border-top:1px solid var(--border-color);display:flex;flex-wrap:wrap;gap:.35rem">
+                    <div style="padding-top:.5rem;border-top:1px solid var(--border-color);display:flex;flex-wrap:wrap;gap:.35rem;align-items:center;">
                         @foreach($field->crops as $crop)
-                        <span class="fs-crop-tag">{{ $crop->name }} <span style="color:{{ $crop->health_score >= 80 ? '#22c55e' : '#f59e0b' }};font-weight:700">{{ $crop->health_score }}%</span></span>
+                        <span class="fs-crop-tag" onclick="editCrop({{ $crop->id }}, '{{ addslashes($crop->name) }}', {{ $crop->health_score }})" style="cursor:pointer" title="Edit Crop">{{ $crop->name }} <span style="color:{{ $crop->health_score >= 80 ? '#22c55e' : '#f59e0b' }};font-weight:700">{{ $crop->health_score }}%</span></span>
                         @endforeach
+                        <button onclick="addCrop({{ $field->id }})" style="background:none;border:1px dashed var(--border-color);border-radius:6px;padding:0.2rem 0.5rem;font-size:0.7rem;cursor:pointer;color:var(--text-muted)">+ Add</button>
+                    </div>
+                    @else
+                    <div style="padding-top:.5rem;border-top:1px solid var(--border-color);display:flex;flex-wrap:wrap;gap:.35rem">
+                        <button onclick="addCrop({{ $field->id }})" style="background:none;border:1px dashed var(--border-color);border-radius:6px;padding:0.2rem 0.5rem;font-size:0.7rem;cursor:pointer;color:var(--text-muted)">+ Add Crop</button>
                     </div>
                     @endif
                 </div>
@@ -250,8 +255,42 @@ document.addEventListener('DOMContentLoaded', function () {
                 @csrf
                 <input type="hidden" name="geojson" id="geojson_input" value="{{ old('geojson') }}">
                 <label class="fs-label">Zone Identifier</label><input type="text" name="name" required placeholder="e.g. North Plot A" class="fs-input" value="{{ old('name') }}">
-                <div class="fs-row"><div><label class="fs-label">Size (Acres)</label><input type="number" step="0.01" name="area_acres" required placeholder="0.00" class="fs-input" style="font-family:monospace" value="{{ old('area_acres') }}"></div><div><label class="fs-label">Substrate</label><select name="soil_type" class="fs-input"><option value="Loam" {{ old('soil_type') == 'Loam' ? 'selected' : '' }}>Loam</option><option value="Clay" {{ old('soil_type') == 'Clay' ? 'selected' : '' }}>Clay</option><option value="Sandy" {{ old('soil_type') == 'Sandy' ? 'selected' : '' }}>Sandy</option><option value="Silt" {{ old('soil_type') == 'Silt' ? 'selected' : '' }}>Silt</option></select></div></div>
-                <label class="fs-label">Active Crop</label><input type="text" name="current_crop" placeholder="e.g. Wheat" class="fs-input" value="{{ old('current_crop') }}">
+                <div class="fs-row">
+                    <div>
+                        <label class="fs-label">Size (Acres)</label>
+                        <input type="number" step="0.01" name="area_acres" required placeholder="0.00" class="fs-input" style="font-family:monospace" value="{{ old('area_acres') }}">
+                    </div>
+                    <div>
+                        <label class="fs-label">Substrate / Soil Type</label>
+                        <select name="soil_type" class="fs-input">
+                            @foreach(['Loam','Clay','Sandy','Silt','Sandy Loam','Clay Loam','Silty Clay','Peat','Chalky','Peaty'] as $soil)
+                            <option value="{{ $soil }}" {{ old('soil_type','Loam') == $soil ? 'selected' : '' }}>{{ $soil }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                </div>
+                <div class="fs-row">
+                    <div>
+                        <label class="fs-label">Active Crop</label>
+                        <select name="current_crop" class="fs-input">
+                            <option value="">— None / Fallow —</option>
+                            @php
+                                $crops = ['Wheat','Rice','Maize (Corn)','Sugarcane','Cotton','Soybean','Barley','Sorghum','Millet','Oats','Sunflower','Canola (Rapeseed)','Groundnut (Peanut)','Chickpea','Lentil','Potato','Tomato','Onion','Garlic','Chilli Pepper','Cabbage','Cauliflower','Spinach','Carrot','Cucumber','Pumpkin','Watermelon','Mango','Banana','Papaya','Grapes','Strawberry','Apple','Orange','Lemon','Coffee','Tea','Turmeric','Ginger','Coriander'];
+                            @endphp
+                            @foreach($crops as $crop)
+                            <option value="{{ $crop }}" {{ old('current_crop') == $crop ? 'selected' : '' }}>{{ $crop }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div>
+                        <label class="fs-label">Zone Status</label>
+                        <select name="status" class="fs-input">
+                            <option value="active"     {{ old('status','active') == 'active'     ? 'selected' : '' }}>🟢 Active</option>
+                            <option value="preparing"  {{ old('status') == 'preparing'  ? 'selected' : '' }}>🟡 Preparing</option>
+                            <option value="fallow"     {{ old('status') == 'fallow'     ? 'selected' : '' }}>⚪ Fallow</option>
+                        </select>
+                    </div>
+                </div>
                 <div style="display:flex;justify-content:flex-end;gap:.75rem;padding-top:.75rem;border-top:1px solid var(--border-color)"><button type="button" onclick="toggleModal('addFieldModal')" class="fs-btn-cancel">Cancel</button><button type="submit" class="fs-btn-submit">Initialize Zone</button></div>
             </form>
         </div>
@@ -272,10 +311,40 @@ document.addEventListener('DOMContentLoaded', function () {
             @endif
             <form action="{{ route('sensors.store', $farm) }}" method="POST">
                 @csrf
-                <label class="fs-label">Device ID / MAC</label><input type="text" name="device_id" required placeholder="e.g. ESP32-A8F9" class="fs-input" style="font-family:monospace" value="{{ old('device_id') }}">
-                <label class="fs-label">Display Name</label><input type="text" name="name" required placeholder="e.g. Main Soil Probe" class="fs-input" value="{{ old('name') }}">
-                <label class="fs-label">Hardware Type</label><select name="type" required class="fs-input"><option value="soil_moisture" {{ old('type') == 'soil_moisture' ? 'selected' : '' }}>Soil Moisture Node</option><option value="weather_station" {{ old('type') == 'weather_station' ? 'selected' : '' }}>Weather Telemetry</option><option value="water_level" {{ old('type') == 'water_level' ? 'selected' : '' }}>Water Level Sensor</option><option value="camera" {{ old('type') == 'camera' ? 'selected' : '' }}>Optical Node</option></select>
-                <label class="fs-label">Zone Assignment (Optional)</label><select name="field_id" class="fs-input"><option value="">-- Unassigned --</option>@foreach($farm->fields as $field)<option value="{{ $field->id }}" {{ old('field_id') == $field->id ? 'selected' : '' }}>{{ $field->name }}</option>@endforeach</select>
+                <label class="fs-label">Device ID / MAC</label>
+                <input type="text" name="device_id" required placeholder="e.g. ESP32-A8F9" class="fs-input" style="font-family:monospace" value="{{ old('device_id') }}">
+                <label class="fs-label">Hardware Type</label>
+                <select name="type" id="sensor-type-select" required class="fs-input" onchange="autoFillSensorName(this)">
+                    @php
+                        $sensorTypes = [
+                            'soil_moisture'   => 'Soil Moisture Node',
+                            'temperature'     => 'Temperature Sensor',
+                            'humidity'        => 'Humidity Sensor',
+                            'weather_station' => 'Weather Station (Multi-sensor)',
+                            'water_level'     => 'Water Level Sensor',
+                            'ph_sensor'       => 'Soil pH Sensor',
+                            'light'           => 'Light Intensity Sensor',
+                            'wind'            => 'Wind Speed / Direction Sensor',
+                            'rainfall'        => 'Rain Gauge',
+                            'camera'          => 'Optical / Camera Node',
+                            'irrigation_valve'=> 'Irrigation Valve Controller',
+                        ];
+                    @endphp
+                    @foreach($sensorTypes as $val => $label)
+                    <option value="{{ $val }}" {{ old('type','soil_moisture') == $val ? 'selected' : '' }}>{{ $label }}</option>
+                    @endforeach
+                </select>
+                <label class="fs-label">Display Name</label>
+                <input type="text" name="name" id="sensor-name-input" required placeholder="e.g. Main Soil Probe" class="fs-input" value="{{ old('name') }}">
+                <label class="fs-label">Zone Assignment (Optional)</label>
+                <select name="field_id" class="fs-input">
+                    <option value="">— Unassigned —</option>
+                    @foreach($farm->fields as $field)
+                    <option value="{{ $field->id }}" {{ old('field_id') == $field->id ? 'selected' : '' }}>
+                        {{ $field->name }}{{ $field->current_crop ? ' · ' . $field->current_crop : '' }}
+                    </option>
+                    @endforeach
+                </select>
                 <div style="display:flex;justify-content:flex-end;gap:.75rem;padding-top:.75rem;border-top:1px solid var(--border-color)"><button type="button" onclick="toggleModal('addSensorModal')" class="fs-btn-cancel">Cancel</button><button type="submit" class="fs-btn-submit">Complete Pairing</button></div>
             </form>
         </div>
@@ -292,8 +361,32 @@ document.addEventListener('DOMContentLoaded', function () {
                 @method('PUT')
                 <label class="fs-label">Farm Name</label>
                 <input name="name" required class="fs-input" value="{{ old('name', $farm->name) }}">
+
                 <label class="fs-label">Location</label>
-                <input name="location" required class="fs-input" value="{{ old('location', $farm->location) }}">
+                <div style="position:relative;margin-bottom:.25rem">
+                    <input name="location" id="edit-location-input" required class="fs-input"
+                        value="{{ old('location', $farm->location) }}"
+                        style="margin-bottom:0;padding-right:2.5rem"
+                        oninput="clearEditCoords()">
+                    <button type="button" onclick="useGPS('edit')" title="Use my current location"
+                        style="position:absolute;right:.6rem;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:var(--primary);font-size:.95rem">
+                        <i class="fas fa-location-arrow"></i>
+                    </button>
+                </div>
+                <div id="edit-geocode-status" style="font-size:.75rem;margin-bottom:.75rem;display:none"></div>
+
+                {{-- Show current coordinates if set --}}
+                @if($farm->latitude && $farm->longitude)
+                <div style="font-size:.72rem;color:#166534;background:#dcfce7;padding:.4rem .65rem;border-radius:6px;margin-bottom:.75rem">
+                    <i class="fas fa-map-pin"></i>
+                    Current: {{ $farm->latitude }}, {{ $farm->longitude }}
+                    — weather is active
+                </div>
+                @endif
+
+                <input type="hidden" name="latitude"  id="edit-lat"  value="{{ old('latitude',  $farm->latitude) }}">
+                <input type="hidden" name="longitude" id="edit-lng"  value="{{ old('longitude', $farm->longitude) }}">
+
                 <div class="fs-row">
                     <div>
                         <label class="fs-label">Area (acres)</label>
@@ -302,10 +395,9 @@ document.addEventListener('DOMContentLoaded', function () {
                     <div>
                         <label class="fs-label">Soil Type</label>
                         <select name="soil_type" class="fs-input">
-                            <option value="Loam" {{ old('soil_type', $farm->soil_type) == 'Loam' ? 'selected' : '' }}>Loam</option>
-                            <option value="Clay" {{ old('soil_type', $farm->soil_type) == 'Clay' ? 'selected' : '' }}>Clay</option>
-                            <option value="Sandy" {{ old('soil_type', $farm->soil_type) == 'Sandy' ? 'selected' : '' }}>Sandy</option>
-                            <option value="Silt" {{ old('soil_type', $farm->soil_type) == 'Silt' ? 'selected' : '' }}>Silt</option>
+                            @foreach(['Loam','Clay','Sandy','Silt','Sandy Loam','Clay Loam','Silty Clay','Peat','Chalky','Alluvial'] as $s)
+                            <option value="{{ $s }}" {{ old('soil_type', $farm->soil_type) == $s ? 'selected' : '' }}>{{ $s }}</option>
+                            @endforeach
                         </select>
                     </div>
                 </div>
@@ -320,5 +412,156 @@ document.addEventListener('DOMContentLoaded', function () {
     </div>
 </div>
 
-<script>function toggleModal(id){document.getElementById(id).classList.toggle('hidden')}</script>
+<!-- Crop Modal -->
+<div id="cropModal" class="fs-modal-bg hidden">
+    <div class="fs-modal">
+        <div class="fs-modal-header"><h3 id="cropModalTitle">Add Crop</h3><button type="button" onclick="toggleModal('cropModal')" style="background:none;border:none;color:var(--text-muted);cursor:pointer"><i class="fas fa-times"></i></button></div>
+        <div class="fs-modal-body">
+            <form id="cropForm" method="POST" action="">
+                @csrf
+                <input type="hidden" name="_method" id="cropMethod" value="POST">
+                <label class="fs-label">Crop Name</label>
+                <input type="text" name="name" id="cropName" required class="fs-input" placeholder="e.g. Wheat">
+                <label class="fs-label">Health Score (0-100)</label>
+                <input type="number" name="health_score" id="cropHealth" required class="fs-input" min="0" max="100" value="100">
+                <div style="display:flex;justify-content:space-between;gap:.75rem;padding-top:.75rem;border-top:1px solid var(--border-color)">
+                    <button type="button" id="deleteCropBtn" onclick="deleteCrop()" class="fs-btn-cancel hidden" style="color:#ef4444;padding-left:0"><i class="fas fa-trash"></i> Delete</button>
+                    <div style="display:flex;gap:.75rem;margin-left:auto">
+                        <button type="button" onclick="toggleModal('cropModal')" class="fs-btn-cancel">Cancel</button>
+                        <button type="submit" class="fs-btn-submit">Save Crop</button>
+                    </div>
+                </div>
+            </form>
+            <form id="deleteCropForm" method="POST" action="" class="hidden">
+                @csrf
+                @method('DELETE')
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+function toggleModal(id) {
+    document.getElementById(id).classList.toggle('hidden');
+}
+
+function addCrop(fieldId) {
+    document.getElementById('cropModalTitle').innerText = 'Add Crop';
+    document.getElementById('cropForm').action = `/fields/${fieldId}/crops`;
+    document.getElementById('cropMethod').value = 'POST';
+    document.getElementById('cropName').value = '';
+    document.getElementById('cropHealth').value = '100';
+    document.getElementById('deleteCropBtn').classList.add('hidden');
+    toggleModal('cropModal');
+}
+
+function editCrop(cropId, name, health) {
+    document.getElementById('cropModalTitle').innerText = 'Edit Crop';
+    document.getElementById('cropForm').action = `/crops/${cropId}`;
+    document.getElementById('cropMethod').value = 'PUT';
+    document.getElementById('cropName').value = name;
+    document.getElementById('cropHealth').value = health;
+    document.getElementById('deleteCropForm').action = `/crops/${cropId}`;
+    document.getElementById('deleteCropBtn').classList.remove('hidden');
+    toggleModal('cropModal');
+}
+
+function deleteCrop() {
+    if (confirm('Are you sure you want to delete this crop?')) {
+        document.getElementById('deleteCropForm').submit();
+    }
+}
+
+// ── Geocoding helpers (Edit Farm modal) ───────────────────────────────────────
+function clearEditCoords() {
+    document.getElementById('edit-lat').value = '';
+    document.getElementById('edit-lng').value = '';
+    showEditStatus('', '');
+}
+
+function showEditStatus(msg, color) {
+    const el = document.getElementById('edit-geocode-status');
+    if (!el) return;
+    el.textContent = msg;
+    el.style.color = color;
+    el.style.display = msg ? 'block' : 'none';
+}
+
+function useGPS(prefix) {
+    if (!navigator.geolocation) {
+        showEditStatus('⚠️ GPS not supported by your browser.', '#b91c1c');
+        return;
+    }
+    showEditStatus('⏳ Getting your location…', '#64748b');
+    navigator.geolocation.getCurrentPosition(
+        (pos) => {
+            const lat = pos.coords.latitude.toFixed(7);
+            const lng = pos.coords.longitude.toFixed(7);
+            document.getElementById('edit-lat').value = lat;
+            document.getElementById('edit-lng').value = lng;
+            showEditStatus('✅ GPS set: ' + lat + ', ' + lng, '#166534');
+            fetch('https://nominatim.openstreetmap.org/reverse?format=json&lat=' + lat + '&lon=' + lng)
+                .then(r => r.json())
+                .then(data => {
+                    const addr = data.address;
+                    const label = [addr.village || addr.town || addr.city, addr.state, addr.country]
+                        .filter(Boolean).join(', ');
+                    if (label) document.getElementById('edit-location-input').value = label;
+                })
+                .catch(() => {});
+        },
+        () => showEditStatus('⚠️ GPS access denied. Enter location manually.', '#b91c1c')
+    );
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    const editInput = document.getElementById('edit-location-input');
+    if (editInput) {
+        editInput.addEventListener('blur', () => {
+            if (!document.getElementById('edit-lat').value) {
+                const query = editInput.value.trim();
+                if (query.length < 4) return;
+                showEditStatus('⏳ Looking up coordinates…', '#64748b');
+                fetch('https://nominatim.openstreetmap.org/search?format=json&limit=1&q=' + encodeURIComponent(query))
+                    .then(r => r.json())
+                    .then(data => {
+                        if (data.length > 0) {
+                            const lat = parseFloat(data[0].lat).toFixed(7);
+                            const lng = parseFloat(data[0].lon).toFixed(7);
+                            document.getElementById('edit-lat').value = lat;
+                            document.getElementById('edit-lng').value = lng;
+                            showEditStatus('✅ Coordinates found: ' + lat + ', ' + lng + ' — weather will be fetched automatically.', '#166534');
+                        } else {
+                            showEditStatus('⚠️ Location not found. Try a more specific name.', '#92400e');
+                        }
+                    })
+                    .catch(() => showEditStatus('⚠️ Geocoding failed.', '#b91c1c'));
+            }
+        });
+    }
+});
+
+// ── Sensor name auto-fill ─────────────────────────────────────────────────────
+const sensorNameSuggestions = {
+    'soil_moisture':    'Soil Moisture Probe',
+    'temperature':      'Temperature Sensor',
+    'humidity':         'Humidity Sensor',
+    'weather_station':  'Weather Station',
+    'water_level':      'Water Level Sensor',
+    'ph_sensor':        'Soil pH Sensor',
+    'light':            'Light Intensity Sensor',
+    'wind':             'Wind Sensor',
+    'rainfall':         'Rain Gauge',
+    'camera':           'Optical Node',
+    'irrigation_valve': 'Irrigation Valve',
+};
+
+function autoFillSensorName(select) {
+    const nameInput = document.getElementById('sensor-name-input');
+    const suggestion = sensorNameSuggestions[select.value] || '';
+    const currentVal = nameInput.value.trim();
+    const wasAutoFilled = Object.values(sensorNameSuggestions).includes(currentVal) || currentVal === '';
+    if (wasAutoFilled) nameInput.value = suggestion;
+}
+</script>
 @endsection

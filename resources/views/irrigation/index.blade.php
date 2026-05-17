@@ -105,10 +105,16 @@
                         $userFarmIds = auth()->user()->isAdmin()
                             ? \App\Models\Farm::pluck('id')
                             : auth()->user()->farms()->pluck('id');
-                        $allFields = \App\Models\Field::whereIn('farm_id', $userFarmIds)->get();
+                        $allFarms = \App\Models\Farm::whereIn('id', $userFarmIds)->with('fields')->get();
                     @endphp
-                    @foreach($allFields as $field)
-                        <option value="{{ $field->id }}">{{ $field->name }}</option>
+                    @foreach($allFarms as $farm)
+                        @if($farm->fields->count() > 0)
+                            <optgroup label="{{ $farm->name }}">
+                                @foreach($farm->fields as $field)
+                                    <option value="{{ $field->id }}">{{ $field->name }}</option>
+                                @endforeach
+                            </optgroup>
+                        @endif
                     @endforeach
                 </select>
                 <select name="duration" class="irr-select" style="width: 120px; flex: none;">
@@ -160,12 +166,20 @@
     <div class="irr-card">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem;">
             <div class="irr-card-title">Schedules</div>
+            <button type="button" onclick="document.getElementById('schedule-modal').classList.remove('hidden')" style="background: var(--primary); color: white; border: none; padding: 0.4rem 0.8rem; border-radius: 6px; font-size: 0.75rem; font-weight: 700; cursor: pointer;">+ Add</button>
         </div>
         @forelse($schedules as $schedule)
         <div class="schedule-item">
             <div class="schedule-header">
                 <div class="schedule-name">{{ $schedule->name }}</div>
-                <span class="schedule-badge {{ $schedule->is_active ? 'badge-active' : 'badge-paused' }}">{{ $schedule->is_active ? 'Active' : 'Paused' }}</span>
+                <div style="display: flex; gap: 0.5rem; align-items: center;">
+                    <span class="schedule-badge {{ $schedule->is_active ? 'badge-active' : 'badge-paused' }}">{{ $schedule->is_active ? 'Active' : 'Paused' }}</span>
+                    <form method="POST" action="{{ route('schedules.destroy', $schedule) }}" onsubmit="return confirm('Delete this schedule?');">
+                        @csrf
+                        @method('DELETE')
+                        <button type="submit" style="background: none; border: none; color: #ef4444; cursor: pointer; font-size: 0.85rem;"><i class="fas fa-trash"></i></button>
+                    </form>
+                </div>
             </div>
             <div class="schedule-meta">
                 <div><i class="fas fa-clock"></i> {{ \Carbon\Carbon::parse($schedule->start_time)->format('h:i A') }}</div>
@@ -229,6 +243,82 @@
             </table>
         </div>
         <div style="margin-top: 1rem;">{{ $recentLogs->links() }}</div>
+    </div>
+</div>
+
+<!-- Add Schedule Modal -->
+<div id="schedule-modal" class="hidden" style="position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: flex; justify-content: center; align-items: center; z-index: 50;">
+    <div style="background: white; border-radius: 12px; width: 100%; max-width: 500px; padding: 1.5rem; box-shadow: 0 10px 25px rgba(0,0,0,0.2);">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+            <h3 style="margin: 0; font-size: 1.2rem; font-weight: 800; color: var(--text-main);">New Schedule</h3>
+            <button onclick="document.getElementById('schedule-modal').classList.add('hidden')" style="background: none; border: none; font-size: 1.2rem; color: var(--text-muted); cursor: pointer;"><i class="fas fa-times"></i></button>
+        </div>
+        <form method="POST" action="{{ route('schedules.store') }}">
+            @csrf
+            <div style="margin-bottom: 1rem;">
+                <label style="display: block; font-size: 0.85rem; font-weight: 700; margin-bottom: 0.4rem; color: var(--text-main);">Schedule Name</label>
+                <input type="text" name="name" required style="width: 100%; padding: 0.65rem 1rem; border: 1px solid var(--border-color); border-radius: 8px; font-size: 0.9rem;">
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+                <div>
+                    <label style="display: block; font-size: 0.85rem; font-weight: 700; margin-bottom: 0.4rem; color: var(--text-main);">Farm</label>
+                    <select name="farm_id" required style="width: 100%; padding: 0.65rem 1rem; border: 1px solid var(--border-color); border-radius: 8px; font-size: 0.9rem;">
+                        @foreach(auth()->user()->isAdmin() ? \App\Models\Farm::all() : auth()->user()->farms as $farm)
+                            <option value="{{ $farm->id }}">{{ $farm->name }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                <div>
+                    <label style="display: block; font-size: 0.85rem; font-weight: 700; margin-bottom: 0.4rem; color: var(--text-main);">Field</label>
+                    <select name="field_id" style="width: 100%; padding: 0.65rem 1rem; border: 1px solid var(--border-color); border-radius: 8px; font-size: 0.9rem;">
+                        <option value="">All Fields</option>
+                        @foreach(\App\Models\Farm::whereIn('id', auth()->user()->isAdmin() ? \App\Models\Farm::pluck('id') : auth()->user()->farms()->pluck('id'))->with('fields')->get() as $farm)
+                            @if($farm->fields->count() > 0)
+                                <optgroup label="{{ $farm->name }}">
+                                    @foreach($farm->fields as $field)
+                                        <option value="{{ $field->id }}">{{ $field->name }}</option>
+                                    @endforeach
+                                </optgroup>
+                            @endif
+                        @endforeach
+                    </select>
+                </div>
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+                <div>
+                    <label style="display: block; font-size: 0.85rem; font-weight: 700; margin-bottom: 0.4rem; color: var(--text-main);">Start Time</label>
+                    <input type="time" name="start_time" required style="width: 100%; padding: 0.65rem 1rem; border: 1px solid var(--border-color); border-radius: 8px; font-size: 0.9rem;">
+                </div>
+                <div>
+                    <label style="display: block; font-size: 0.85rem; font-weight: 700; margin-bottom: 0.4rem; color: var(--text-main);">Duration (mins)</label>
+                    <input type="number" name="duration_minutes" value="30" required min="1" style="width: 100%; padding: 0.65rem 1rem; border: 1px solid var(--border-color); border-radius: 8px; font-size: 0.9rem;">
+                </div>
+            </div>
+            <div style="margin-bottom: 1rem;">
+                <label style="display: block; font-size: 0.85rem; font-weight: 700; margin-bottom: 0.4rem; color: var(--text-main);">Days of Week</label>
+                <select name="days_of_week[]" multiple required style="width: 100%; padding: 0.65rem 1rem; border: 1px solid var(--border-color); border-radius: 8px; font-size: 0.9rem;" size="4">
+                    <option value="monday" selected>Monday</option>
+                    <option value="tuesday" selected>Tuesday</option>
+                    <option value="wednesday" selected>Wednesday</option>
+                    <option value="thursday" selected>Thursday</option>
+                    <option value="friday" selected>Friday</option>
+                    <option value="saturday">Saturday</option>
+                    <option value="sunday">Sunday</option>
+                </select>
+                <small style="color: var(--text-muted); font-size: 0.75rem;">Hold Ctrl/Cmd to select multiple</small>
+            </div>
+            <div style="display: flex; gap: 1rem; margin-bottom: 1.5rem;">
+                <div style="flex: 1; display: flex; align-items: center; gap: 0.5rem; background: #f8fafc; padding: 0.75rem; border-radius: 8px; border: 1px solid var(--border-color);">
+                    <input type="checkbox" name="is_smart" value="1" id="is_smart" style="width: 1.2rem; height: 1.2rem;">
+                    <label for="is_smart" style="font-size: 0.85rem; font-weight: 700; color: var(--text-main); cursor: pointer; margin: 0;">Smart Schedule</label>
+                </div>
+                <div style="flex: 1;">
+                    <label style="display: block; font-size: 0.85rem; font-weight: 700; margin-bottom: 0.4rem; color: var(--text-main);">Moisture Threshold (%)</label>
+                    <input type="number" name="moisture_threshold" value="30" min="0" max="100" style="width: 100%; padding: 0.65rem 1rem; border: 1px solid var(--border-color); border-radius: 8px; font-size: 0.9rem;">
+                </div>
+            </div>
+            <button type="submit" style="width: 100%; padding: 0.75rem; background: var(--primary); color: white; border: none; border-radius: 8px; font-weight: 700; font-size: 0.9rem; cursor: pointer;">Save Schedule</button>
+        </form>
     </div>
 </div>
 @endsection

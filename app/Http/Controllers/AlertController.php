@@ -42,16 +42,30 @@ class AlertController extends Controller
 
     public function markRead(Alert $alert)
     {
+        if (!Auth::user()->isAdmin() && $alert->farm->user_id !== Auth::id()) {
+            abort(403);
+        }
         $alert->update(['is_read' => true]);
         return back()->with('success', 'Alert marked as read.');
     }
 
     public function resolve(Alert $alert)
     {
+        if (!Auth::user()->isAdmin() && $alert->farm->user_id !== Auth::id()) {
+            abort(403);
+        }
         $alert->update([
             'is_resolved' => true,
             'is_read' => true,
             'resolved_at' => now(),
+        ]);
+
+        \App\Models\ActivityLog::create([
+            'user_id' => Auth::id(),
+            'farm_id' => $alert->farm_id,
+            'action' => 'alert.resolve',
+            'description' => Auth::user()->name . ' resolved alert: ' . $alert->title,
+            'ip_address' => request()->ip(),
         ]);
         return back()->with('success', 'Alert resolved.');
     }

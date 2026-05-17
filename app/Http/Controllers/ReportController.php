@@ -60,10 +60,8 @@ class ReportController extends Controller
             ->latest()
             ->take(20)
             ->get();
-            
-        $diseases = $farm->diseases()->latest()->take(10)->get();
 
-        $pdf = Pdf::loadView('reports.pdf_template', compact('farm', 'sensors', 'recentAlerts', 'diseases'));
+        $pdf = Pdf::loadView('reports.pdf_template', compact('farm', 'sensors', 'recentAlerts'));
         
         return $pdf->download('farm_compliance_report_' . $farm->id . '_' . now()->format('Ymd') . '.pdf');
     }

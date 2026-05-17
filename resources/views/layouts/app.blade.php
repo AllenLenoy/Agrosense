@@ -348,9 +348,6 @@
 
             <div class="nav-section">
                 <div class="nav-title">Analytics & Intelligence</div>
-                <a href="{{ route('diseases.index') }}" class="nav-link {{ request()->routeIs('diseases.*') ? 'active' : '' }}">
-                    <i class="fas fa-virus"></i> Disease AI
-                </a>
                 <a href="{{ route('recommendations.index') }}" class="nav-link {{ request()->routeIs('recommendations.*') ? 'active' : '' }}">
                     <i class="fas fa-chart-line"></i> Insights
                 </a>

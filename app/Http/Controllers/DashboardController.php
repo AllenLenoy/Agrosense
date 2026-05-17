@@ -23,13 +23,32 @@ class DashboardController extends Controller
             ? Farm::with('sensors', 'fields.crops')->get()
             : $user->farms()->with('sensors', 'fields.crops')->get();
 
-        $activeFarm = $farms->first();
+        $activeFarmId = request()->query('farm_id');
+        if ($activeFarmId) {
+            session(['active_farm_id' => $activeFarmId]);
+        } else {
+            $activeFarmId = session('active_farm_id');
+        }
+        $activeFarm = $activeFarmId
+            ? $farms->firstWhere('id', $activeFarmId)
+            : $farms->first();
 
         if (!$activeFarm) {
             return view('dashboard.index', [
                 'farms' => $farms,
                 'activeFarm' => null,
-                'stats' => [],
+                'stats' => [
+                    'total_farms' => 0,
+                    'total_sensors' => 0,
+                    'online_sensors' => 0,
+                    'total_fields' => 0,
+                    'total_crops' => 0,
+                    'active_alerts' => 0,
+                    'avg_soil_moisture' => 0,
+                    'avg_temperature' => 0,
+                    'avg_humidity' => 0,
+                    'water_level' => 0,
+                ],
                 'recentAlerts' => collect(),
                 'recentActivity' => collect(),
                 'sensorData' => [],
@@ -66,9 +85,11 @@ class DashboardController extends Controller
             ->get();
 
         // Active irrigation
-        $irrigationActive = IrrigationLog::where('farm_id', $activeFarm->id)
+        $activeIrrigations = IrrigationLog::where('farm_id', $activeFarm->id)
             ->where('status', 'active')
-            ->first();
+            ->get();
+        $irrigationActive = $activeIrrigations->count() > 0;
+        $activeIrrigationCount = $activeIrrigations->count();
 
         // Weather
         $weather = WeatherData::where('farm_id', $activeFarm->id)
@@ -90,7 +111,7 @@ class DashboardController extends Controller
 
         return view('dashboard.index', compact(
             'farms', 'activeFarm', 'stats', 'recentAlerts', 'recentActivity',
-            'sensorData', 'irrigationActive', 'weather', 'crops', 'chartData', 'sensors'
+            'sensorData', 'irrigationActive', 'activeIrrigationCount', 'weather', 'crops', 'chartData', 'sensors'
         ));
     }
 
